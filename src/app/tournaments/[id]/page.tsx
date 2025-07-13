@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import AuthGuard from '@/components/AuthGuard'
 import type { User } from '@supabase/supabase-js'
 
 type Tournament = {
@@ -105,70 +104,68 @@ export default function TournamentDetailPage({
   }
 
   return (
-    <AuthGuard>
-      <div className="container mx-auto px-4 py-8">
-        {loading ? (
-          <p>Loading tournament details...</p>
-        ) : tournament ? (
-          <div>
-            <div className="flex justify-between items-center">
-              <h1 className="text-4xl font-bold text-gray-800">{tournament.name}</h1>
+    <div className="container mx-auto px-4 py-8">
+      {loading ? (
+        <p>Loading tournament details...</p>
+      ) : tournament ? (
+        <div>
+          <div className="flex justify-between items-center">
+            <h1 className="text-4xl font-bold text-gray-800">{tournament.name}</h1>
+            <div className="flex items-center gap-4">
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-4">
-                  <span className="text-lg font-semibold uppercase px-4 py-2 bg-green-200 text-green-800 rounded-full">
-                    {tournament.status}
-                  </span>
-                  <span className="text-lg text-gray-600 capitalize">
-                    {tournament.structure.replace(/_/g, ' ')}
-                  </span>
-                </div>
+                <span className="text-lg font-semibold uppercase px-4 py-2 bg-green-200 text-green-800 rounded-full">
+                  {tournament.status}
+                </span>
+                <span className="text-lg text-gray-600 capitalize">
+                  {tournament.structure.replace(/_/g, ' ')}
+                </span>
               </div>
-            </div>
-            
-            {/* Team Management for Creator */}
-            {isCreator && tournament.status === 'upcoming' && (
-              <div className="mt-8 bg-white p-8 rounded-lg shadow">
-                <h2 className="text-2xl font-bold text-gray-800 mb-4">Manage Teams</h2>
-                <form onSubmit={handleAddTeam} className="flex items-center gap-4">
-                  <select
-                    value={selectedTeam}
-                    onChange={(e) => setSelectedTeam(e.target.value)}
-                    className="flex-grow p-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="">Select a team to add</option>
-                    {teams
-                      .filter(team => !participants.some(p => p.team.name === team.name))
-                      .map(team => <option key={team.id} value={team.id}>{team.name}</option>)
-                    }
-                  </select>
-                  <button type="submit" className="px-6 py-2 text-white bg-green-600 rounded-md hover:bg-green-700">Add Team</button>
-                </form>
-              </div>
-            )}
-
-            {/* Participants List */}
-            <div className="mt-8">
-              <h3 className="text-3xl font-bold text-gray-800 mb-4">Participants</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {participants.length > 0 ? participants.map(p => (
-                  <div key={p.id} className="p-4 bg-gray-100 rounded-lg text-center">
-                    <span className="font-semibold">{p.team.name}</span>
-                  </div>
-                )) : (
-                  <p className="text-gray-500">No teams have been added yet.</p>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-8 bg-white p-8 rounded-lg shadow">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">Tournament Bracket</h2>
-              <p>The tournament bracket will be displayed here once the tournament starts.</p>
             </div>
           </div>
-        ) : (
-          <p>Tournament not found.</p>
-        )}
-      </div>
-    </AuthGuard>
+          
+          {/* Team Management for Creator */}
+          {isCreator && tournament.status === 'upcoming' && (
+            <div className="mt-8 bg-white p-8 rounded-lg shadow">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">Manage Teams</h2>
+              <form onSubmit={handleAddTeam} className="flex items-center gap-4">
+                <select
+                  value={selectedTeam}
+                  onChange={(e) => setSelectedTeam(e.target.value)}
+                  className="flex-grow p-2 border border-gray-300 rounded-md"
+                >
+                  <option value="">Select a team to add</option>
+                  {teams
+                    .filter(team => !participants.some(p => p.team.name === team.name))
+                    .map(team => <option key={team.id} value={team.id}>{team.name}</option>)
+                  }
+                </select>
+                <button type="submit" className="px-6 py-2 text-white bg-green-600 rounded-md hover:bg-green-700">Add Team</button>
+              </form>
+            </div>
+          )}
+
+          {/* Participants List */}
+          <div className="mt-8">
+            <h3 className="text-3xl font-bold text-gray-800 mb-4">Participants</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {participants.length > 0 ? participants.map(p => (
+                <div key={p.id} className="p-4 bg-gray-100 rounded-lg text-center">
+                  <span className="font-semibold">{p.team.name}</span>
+                </div>
+              )) : (
+                <p className="text-gray-500">No teams have been added yet.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-8 bg-white p-8 rounded-lg shadow">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Tournament Bracket</h2>
+            <p>The tournament bracket will be displayed here once the tournament starts.</p>
+          </div>
+        </div>
+      ) : (
+        <p>Tournament not found.</p>
+      )}
+    </div>
   )
 }
