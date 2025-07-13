@@ -16,32 +16,38 @@ type PageProps = {
   params: Promise<{ id: string }>;
 }
 
-export default async function TournamentDetailPage({ params }: PageProps) {
+export default function TournamentDetailPage({ params }: PageProps) {
   const supabase = createClient()
   const [tournament, setTournament] = useState<Tournament | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const { id } = await params;
-
   useEffect(() => {
-    const fetchTournament = async () => {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('tournaments')
-        .select('*')
-        .eq('id', id)
-        .single()
+    // Resolve the params Promise inside useEffect
+    params.then(({ id }) => {
+      const fetchTournament = async () => {
+        setLoading(true)
+        try {
+          const { data, error } = await supabase
+            .from('tournaments')
+            .select('*')
+            .eq('id', id)
+            .single()
 
-      if (data) {
-        setTournament(data)
+          if (error) throw error
+          setTournament(data)
+        } catch (error) {
+          console.error('Error fetching tournament:', error)
+          setTournament(null)
+        } finally {
+          setLoading(false)
+        }
       }
-      setLoading(false)
-    }
 
-    if (id) {
-      fetchTournament()
-    }
-  }, [supabase, id])
+      if (id) {
+        fetchTournament()
+      }
+    })
+  }, [params, supabase])
 
   return (
     <AuthGuard>
@@ -70,4 +76,4 @@ export default async function TournamentDetailPage({ params }: PageProps) {
       </div>
     </AuthGuard>
   )
-} 
+}
