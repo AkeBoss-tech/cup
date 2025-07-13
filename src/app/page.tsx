@@ -1,11 +1,21 @@
-import { createClient } from "@/lib/supabase/server";
-import Link from "next/link";
+'use client'
 
-export default async function Home() {
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
+
+export default function Home() {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+    };
+    fetchUser();
+  }, [supabase]);
 
   return (
     <div className="flex flex-col items-center flex-1 w-full gap-20">
@@ -20,15 +30,14 @@ export default async function Home() {
           Create tournaments, track live scores, and bet on your favorite teams
           with PickleCash.
         </p>
-        {!user && (
+        {!user ? (
           <Link
             href="/login"
             className="px-6 py-3 mt-4 font-semibold text-white bg-green-600 rounded-md hover:bg-green-700"
           >
             Get Started
           </Link>
-        )}
-         {user && (
+        ) : (
           <Link
             href="/tournaments"
             className="px-6 py-3 mt-4 font-semibold text-white bg-green-600 rounded-md hover:bg-green-700"
