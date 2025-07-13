@@ -6,80 +6,147 @@ import type { User } from "@supabase/supabase-js";
 import Header from "@/components/Header";
 import Link from "next/link";
 
-const PromoCard = () => (
-    <div className="bg-green-600 text-white p-8 rounded-2xl flex flex-col items-center justify-center text-center">
-        <h2 className="text-4xl font-black">-50% OFF</h2>
-        <p className="mt-2 font-semibold">your first bet!</p>
-        <p className="text-sm mt-1">Sign up now to claim your bonus.</p>
-        <img src="https://loremflickr.com/400/300/pickleball,sports" alt="Pickleball match" className="mt-4 rounded-lg w-full h-40 object-cover"/>
-    </div>
-)
+interface Player {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+}
 
-const TournamentCard = ({ name, location, image }: { name: string, location: string, image: string }) => (
-    <div className="bg-white p-4 rounded-2xl shadow-md">
-        <img src={image} alt={name} className="w-full h-40 object-cover rounded-lg"/>
-        <h3 className="font-bold text-xl mt-4">{name}</h3>
-        <p className="text-sm text-gray-500">{location}</p>
-        <div className="flex items-center justify-between mt-4">
-            <span className="font-bold text-lg">$25</span>
-            <button className="bg-green-200 text-green-800 font-bold w-10 h-10 rounded-full">+</button>
+interface Tournament {
+    id: string;
+    name: string;
+}
+
+const TournamentCard = ({ tournament }: { tournament: Tournament }) => (
+    <div className="bg-white p-4 rounded-2xl shadow-md transition-transform hover:scale-105">
+        <div className="w-full h-40 bg-gray-200 rounded-lg flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
         </div>
+        <h3 className="font-bold text-xl mt-4">{tournament.name}</h3>
+        <Link href={`/tournaments/${tournament.id}`} className="text-sm text-green-600 hover:underline mt-2 inline-block">
+            View Details
+        </Link>
     </div>
 )
 
 const ActionCard = () => (
-    <div className="bg-yellow-400 p-6 rounded-2xl flex flex-col items-start">
+    <div className="bg-yellow-400 p-6 rounded-2xl flex flex-col items-start transition-shadow hover:shadow-xl">
         <h3 className="text-2xl font-bold">Create a Tournament</h3>
-        <p className="mt-2 text-gray-800">Become a legend.</p>
-        <Link href="/tournaments/create" className="mt-4 font-bold text-gray-900">Learn more &rarr;</Link>
+        <p className="mt-2 text-gray-800">Ready to make your mark?</p>
+        <Link href="/tournaments/create" className="mt-4 font-bold text-gray-900 group">
+            Get Started <span className="transition-transform group-hover:translate-x-1 inline-block">&rarr;</span>
+        </Link>
     </div>
 )
+
+const PlayerSearchBar = () => {
+    const [query, setQuery] = useState('');
+    const [results, setResults] = useState<Player[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (query.length < 2) {
+            setResults([]);
+            return;
+        }
+
+        const fetchPlayers = async () => {
+            setLoading(true);
+            const response = await fetch(`/api/players/search?q=${query}`);
+            const data = await response.json();
+            setResults(data);
+            setLoading(false);
+        };
+
+        const timeoutId = setTimeout(fetchPlayers, 300);
+        return () => clearTimeout(timeoutId);
+
+    }, [query]);
+
+    return (
+        <div className="relative">
+            <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search for a player..."
+                className="w-full p-4 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-green-500"
+            />
+            {loading && <p className="absolute right-4 top-4 text-sm text-gray-500">Searching...</p>}
+            {results.length > 0 && (
+                <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                    {results.map(player => (
+                        <li key={player.id} className="p-4 hover:bg-gray-100">
+                            <Link href={`/players/${player.id}`} className="block">
+                                {player.first_name} {player.last_name}
+                            </Link>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    )
+}
 
 export default function Home() {
   const supabase = createClient();
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingUser, setLoadingUser] = useState(true);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
 
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
-      setLoading(false);
+      setLoadingUser(false);
     };
     fetchUser();
+    
+    const fetchTournaments = async () => {
+        const { data, error } = await supabase.from('tournaments').select('*').limit(6);
+        if (data) {
+            setTournaments(data);
+        }
+    }
+    fetchTournaments();
+
   }, [supabase]);
+
+  if (loadingUser) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div>
         <Header user={user} />
         
-        {/* Main Content Area */}
-        <div className="flex flex-col xl:flex-row gap-8">
-
-            {/* Left/Main Column */}
-            <div className="flex-1">
-                {/* Filters */}
-                <div className="flex space-x-4 mb-6">
-                    <button className="px-6 py-2 bg-green-600 text-white rounded-full font-semibold">All</button>
-                    <button className="px-6 py-2 bg-white text-gray-600 rounded-full font-semibold">Upcoming</button>
-                    <button className="px-6 py-2 bg-white text-gray-600 rounded-full font-semibold">Ongoing</button>
-                    <button className="px-6 py-2 bg-white text-gray-600 rounded-full font-semibold">Completed</button>
+        <div className="container mx-auto px-4 py-8">
+            <div className="text-center mb-12">
+                <h1 className="text-5xl font-extrabold text-gray-900">Welcome to the Cup</h1>
+                <p className="text-xl text-gray-600 mt-4">The ultimate pickleball tournament platform.</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="md:col-span-2">
+                    <h2 className="text-3xl font-bold text-gray-800 mb-6">Recent Tournaments</h2>
+                    {tournaments.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {tournaments.map(t => <TournamentCard key={t.id} tournament={t} />)}
+                        </div>
+                    ) : (
+                        <p>No tournaments found.</p>
+                    )}
                 </div>
                 
-                {/* Featured Tournaments */}
-                <div className="flex flex-col space-y-8">
-                    <div className="flex flex-col sm:flex-row gap-6">
-                        <TournamentCard name="Summer Smash" location="Miami, FL" image="https://loremflickr.com/320/240/pickleball,court" />
-                        <TournamentCard name="Desert Duel" location="Phoenix, AZ" image="https://loremflickr.com/320/240/pickleball,sun" />
-                        <TournamentCard name="City Slam" location="New York, NY" image="https://loremflickr.com/320/240/pickleball,city" />
+                <div className="space-y-8">
+                    <ActionCard />
+                    <div>
+                        <h2 className="text-3xl font-bold text-gray-800 mb-6">Find a Player</h2>
+                        <PlayerSearchBar />
                     </div>
                 </div>
-            </div>
-
-            {/* Right Column */}
-            <div className="w-full xl:w-96 flex flex-col gap-8">
-                <PromoCard />
-                <ActionCard />
             </div>
         </div>
     </div>

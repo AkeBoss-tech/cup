@@ -54,160 +54,156 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
 -- ----------------------------
--- 3. TEAMS TABLE
--- Stores teams, each consisting of two players.
+-- 3. PLAYERS TABLE
+-- Stores data about the players.
 -- ----------------------------
-CREATE TABLE teams (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    name TEXT NOT NULL,
-    player1_id UUID REFERENCES public.profiles(id),
-    player2_id UUID REFERENCES public.profiles(id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    
-    CONSTRAINT unique_team_players CHECK (player1_id <> player2_id)
+CREATE TABLE public.players (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  first_name TEXT NOT NULL,
+  last_name TEXT,
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
-ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Public teams are viewable by everyone."
-  ON teams FOR SELECT
-  USING ( TRUE );
-
-CREATE POLICY "Authenticated users can create teams."
-  ON teams FOR INSERT
-  WITH CHECK ( auth.role() = 'authenticated' );
-
-CREATE POLICY "Team members can update their own team."
-  ON teams FOR UPDATE
-  USING ( auth.uid() = player1_id OR auth.uid() = player2_id );
-
-CREATE POLICY "Team members can delete their own team."
-  ON teams FOR DELETE
-  USING ( auth.uid() = player1_id OR auth.uid() = player2_id );
-
 -- ----------------------------
--- 4. TOURNAMENTS TABLE
--- Stores tournament information.
+-- 4. TEAMS TABLE
+-- Stores data about teams, which consist of two players.
 -- ----------------------------
-CREATE TABLE tournaments (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    name TEXT NOT NULL,
-    creator_id UUID REFERENCES public.profiles(id),
-    start_date TIMESTAMP WITH TIME ZONE,
-    end_date TIMESTAMP WITH TIME ZONE,
-    status TEXT CHECK (status IN ('upcoming', 'ongoing', 'completed')) DEFAULT 'upcoming',
-    structure TEXT CHECK (structure IN ('single_elimination', 'double_elimination')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+CREATE TABLE public.teams (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
-ALTER TABLE tournaments ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Public tournaments are viewable by everyone."
-  ON tournaments FOR SELECT
-  USING ( TRUE );
-
-CREATE POLICY "Authenticated users can create tournaments."
-  ON tournaments FOR INSERT
-  WITH CHECK ( auth.role() = 'authenticated' );
-
-CREATE POLICY "Tournament creators can update their tournaments."
-  ON tournaments FOR UPDATE
-  USING ( auth.uid() = creator_id );
-
-CREATE POLICY "Tournament creators can delete their tournaments."
-  ON tournaments FOR DELETE
-  USING ( auth.uid() = creator_id );
-
 -- ----------------------------
--- 5. TOURNAMENT PARTICIPANTS TABLE
--- A join table between tournaments and teams.
+-- 5. TEAM_PLAYERS TABLE
+-- Junction table to link players to teams.
 -- ----------------------------
-CREATE TABLE tournament_participants (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    tournament_id UUID REFERENCES public.tournaments(id) ON DELETE CASCADE,
-    team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE,
-    
-    UNIQUE(tournament_id, team_id)
+CREATE TABLE public.team_players (
+  team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE,
+  player_id UUID REFERENCES public.players(id) ON DELETE CASCADE,
+  PRIMARY KEY (team_id, player_id)
+);
+  
+-- Create tournaments table
+CREATE TABLE public.tournaments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
-ALTER TABLE tournament_participants ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Public participant list is viewable by everyone."
-  ON tournament_participants FOR SELECT
-  USING ( TRUE );
-
-CREATE POLICY "Tournament creators can add teams."
-  ON tournament_participants FOR INSERT
-  WITH CHECK ( auth.uid() IN (SELECT creator_id FROM tournaments WHERE id = tournament_id) );
-
-CREATE POLICY "Tournament creators can remove teams."
-  ON tournament_participants FOR DELETE
-  USING ( auth.uid() IN (SELECT creator_id FROM tournaments WHERE id = tournament_id) );
-
--- ----------------------------
--- 6. MATCHES TABLE
--- Stores match information for tournaments.
--- ----------------------------
-CREATE TABLE matches (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    tournament_id UUID REFERENCES public.tournaments(id) ON DELETE CASCADE,
-    round_number INTEGER,
-    team1_id UUID REFERENCES public.teams(id),
-    team2_id UUID REFERENCES public.teams(id),
-    team1_score INTEGER DEFAULT 0,
-    team2_score INTEGER DEFAULT 0,
-    winner_id UUID REFERENCES public.teams(id),
-    status TEXT CHECK (status IN ('scheduled', 'ongoing', 'completed', 'locked')) DEFAULT 'scheduled',
-    start_time TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+-- Create matches table
+CREATE TABLE public.matches (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  tournament_id UUID REFERENCES public.tournaments(id) ON DELETE CASCADE,
+  team_1_id UUID REFERENCES public.teams(id),
+  team_2_id UUID REFERENCES public.teams(id),
+  team_1_score INT,
+  team_2_score INT,
+  match_datetime TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+  -- We can add more fields like round number for tournaments
+  round_number INT
 );
 
-ALTER TABLE matches ENABLE ROW LEVEL SECURITY;
+-- Create match_participants table
+CREATE TABLE public.match_participants (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  match_id UUID REFERENCES public.matches(id) ON DELETE CASCADE NOT NULL,
+  player_id UUID REFERENCES public.players(id) ON DELETE CASCADE NOT NULL,
+  team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE NOT NULL,
+  is_winner BOOLEAN,
+  UNIQUE(match_id, player_id) -- A player can only be in a match once
+);
 
-CREATE POLICY "Public matches are viewable by everyone."
-  ON matches FOR SELECT
-  USING ( TRUE );
+-- Create bets table
+CREATE TABLE public.bets (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) NOT NULL,
+  match_id UUID REFERENCES public.matches(id) NOT NULL,
+  winning_team_id INT NOT NULL, -- 1 or 2, refers to team_id in match_participants
+  amount NUMERIC(10, 2) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+  UNIQUE(user_id, match_id) -- A user can only bet once per match
+);
 
-CREATE POLICY "Tournament creators can create matches."
-  ON matches FOR INSERT
-  WITH CHECK ( auth.uid() IN (SELECT creator_id FROM tournaments WHERE id = tournament_id) );
+-- Dummy data for players
+INSERT INTO public.players (first_name, last_name) VALUES
+('Ani', 'T'),
+('Vyas', 'D'),
+('Arnav', 'K'),
+('Krish', 'B');
 
-CREATE POLICY "Tournament creators can update matches."
-  ON matches FOR UPDATE
-  USING ( auth.uid() IN (SELECT creator_id FROM tournaments WHERE id = tournament_id) );
+-- Dummy data for teams
+WITH team1 AS (
+  INSERT INTO public.teams (name) VALUES ('Arnav & Krish') RETURNING id
+),
+team2 AS (
+  INSERT INTO public.teams (name) VALUES ('Ani & Vyas') RETURNING id
+)
+INSERT INTO public.team_players (team_id, player_id)
+SELECT team1.id, p.id FROM team1, public.players p WHERE p.first_name IN ('Arnav', 'Krish')
+UNION ALL
+SELECT team2.id, p.id FROM team2, public.players p WHERE p.first_name IN ('Ani', 'Vyas');
+
+-- Enable RLS
+ALTER TABLE public.players ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.team_players ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tournaments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.matches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.match_participants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bets ENABLE ROW LEVEL SECURITY;
+
+-- Create policies
+CREATE POLICY "Allow all for authenticated users" ON public.players FOR ALL TO authenticated USING (true);
+CREATE POLICY "Allow all for authenticated users" on public.teams FOR ALL TO authenticated USING (true);
+CREATE POLICY "Allow all for authenticated users" on public.team_players FOR ALL TO authenticated USING (true);
+CREATE POLICY "Allow all for authenticated users" ON public.tournaments FOR ALL TO authenticated USING (true);
+CREATE POLICY "Allow all for authenticated users" ON public.matches FOR ALL TO authenticated USING (true);
+CREATE POLICY "Allow all for authenticated users" ON public.match_participants FOR ALL TO authenticated USING (true);
+CREATE POLICY "Allow all for authenticated users" ON public.bets FOR ALL TO authenticated USING (true);
 
 -- ----------------------------
--- 7. BETS TABLE
--- Stores user bets on matches or tournaments.
+-- 6. GET_PLAYER_STATS FUNCTION
+-- Calculates a player's stats, including win/loss record and common teammates.
 -- ----------------------------
-CREATE TABLE bets (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-    match_id UUID REFERENCES public.matches(id) ON DELETE CASCADE,
-    tournament_id UUID REFERENCES public.tournaments(id) ON DELETE CASCADE,
-    team_id UUID REFERENCES public.teams(id) NOT NULL,
-    amount INTEGER NOT NULL,
-    type TEXT CHECK (type IN ('match_winner', 'tournament_winner')),
-    status TEXT CHECK (status IN ('active', 'won', 'lost')) DEFAULT 'active',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-
-    CONSTRAINT bet_on_one_target CHECK (
-        (match_id IS NOT NULL AND tournament_id IS NULL) OR
-        (match_id IS NULL AND tournament_id IS NOT NULL)
+CREATE OR REPLACE FUNCTION get_player_stats(player_id_param UUID)
+RETURNS json AS $$
+DECLARE
+    stats json;
+BEGIN
+    WITH player_matches AS (
+        SELECT
+            m.id,
+            (CASE WHEN t.id = m.team_1_id THEN m.team_1_score > m.team_2_score
+                  ELSE m.team_2_score > m.team_1_score
+             END) as is_win
+        FROM matches m
+        JOIN team_players tp ON tp.team_id = m.team_1_id OR tp.team_id = m.team_2_id
+        JOIN teams t on t.id = tp.team_id
+        WHERE tp.player_id = player_id_param AND m.team_1_score IS NOT NULL AND m.team_2_score IS NOT NULL
     ),
-    CONSTRAINT positive_bet_amount CHECK (amount > 0)
-);
+    common_teammates AS (
+        SELECT
+            p.id,
+            p.first_name,
+            p.last_name,
+            COUNT(*) as games_played_together
+        FROM team_players tp1
+        JOIN team_players tp2 ON tp1.team_id = tp2.team_id AND tp1.player_id != tp2.player_id
+        JOIN players p ON p.id = tp2.player_id
+        WHERE tp1.player_id = player_id_param
+        GROUP BY p.id, p.first_name, p.last_name
+        ORDER BY games_played_together DESC
+        LIMIT 5
+    )
+    SELECT json_build_object(
+        'wins', (SELECT COUNT(*) FROM player_matches WHERE is_win = true),
+        'losses', (SELECT COUNT(*) FROM player_matches WHERE is_win = false),
+        'common_teammates', (SELECT json_agg(json_build_object('id', id, 'first_name', first_name, 'last_name', last_name, 'games_played_together', games_played_together)) FROM common_teammates)
+    ) INTO stats;
 
-ALTER TABLE bets ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view their own bets."
-  ON bets FOR SELECT
-  USING ( auth.uid() = user_id );
-
-CREATE POLICY "Users can place bets."
-  ON bets FOR INSERT
-  WITH CHECK ( auth.uid() = user_id );
-
-CREATE POLICY "Users cannot update their bets."
-  ON bets FOR UPDATE
-  USING ( false ); 
+    RETURN stats;
+END;
+$$ LANGUAGE plpgsql;

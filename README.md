@@ -1,6 +1,6 @@
 # Cash Money Cup 🥒🎾💰
 
-Welcome to the Cash Money Cup, a fun and interactive Pickleball tournament website where you can create tournaments, track matches, and bet on your favorite teams with a fake currency.
+Welcome to the Cash Money Cup, a fun and interactive Pickleball tournament website where you can create tournaments, track matches, and view player statistics.
 
 This project is a client-side rendered application built with Next.js and React, using Supabase for the backend database and authentication.
 
@@ -8,25 +8,22 @@ This project is a client-side rendered application built with Next.js and React,
 
 ### Tournament Management
 - **Create Tournaments:** Users can create their own Pickleball tournaments.
+- **Pre-defined Teams**: Create teams of two players that can be selected for tournaments.
 - **Tournament Brackets:** View dynamic tournament brackets for all ongoing tournaments.
 - **Score Tracking:** Tournament creators can update match scores.
-- **Match Locking:** Once a match begins, betting is locked to prevent cheating.
-- **Flexible Structures:** Creators can randomize or change tournament structures (e.g., single elimination, double elimination).
 
-### Betting System
-- **Fake Currency:** Each user gets a balance of "PickleCash" to bet with.
-- **Match & Tournament Betting:** Bet on individual match winners or the overall tournament champion.
-- **Betting Spreads & Stats:** View betting odds and win probabilities for each team.
+### Player Statistics
+- **Player Search**: Find players using the search bar on the homepage.
+- **Stats Pages**: Each player has a dedicated page showing their win-loss record, win percentage, and most common teammates.
 
 ### User Features
 - **Traditional Authentication:** Sign up and log in with an email and password.
 - **User Profiles:** View your betting history and PickleCash balance.
 - **Tournament Pages:** Each tournament has a dedicated page with all its details.
-- **Player & Match Pages:** View details for each player, team, and match.
 
 ### Gameplay
 - **Doubles Tournaments:** All tournaments are for doubles teams (two players per team).
-- **Pickleball Rules:** Games are played to 11 points.
+- **Pickleball Rules:** Games are played to 11 points (score tracking is now implemented).
 
 ## Tech Stack
 
@@ -45,8 +42,8 @@ This project is a client-side rendered application built with Next.js and React,
 
 1. **Clone the repository:**
    ```bash
-   git clone <repository-url>
-   cd cash-money-cup
+   git clone https://github.com/your-username/cup.git
+   cd cup
    ```
 
 2. **Install dependencies:**
@@ -57,7 +54,7 @@ This project is a client-side rendered application built with Next.js and React,
 3. **Set up Supabase:**
    - Go to [supabase.com](https://supabase.com) and create a new project.
    - In your project dashboard, navigate to the **SQL Editor**.
-   - Open the `database_setup.sql` file from this repository, copy the entire contents, and run it in the SQL Editor.
+   - Open the `database_setup.sql` file from this repository, copy the entire contents, and run it in the SQL Editor. This will set up the necessary tables and functions.
 
 4. **Set up environment variables:**
    - Create a `.env.local` file in the root of the project.
@@ -76,12 +73,20 @@ Open [http://localhost:3000](http://localhost:3000) in your browser to see the r
 
 ## Database Schema
 
-The database schema is defined in the `database_setup.sql` file. It includes tables for `profiles`, `tournaments`, `teams`, `matches`, and `bets`.
+The database schema is defined in the `database_setup.sql` file. It includes tables for `profiles`, `players`, `teams`, `team_players`, `tournaments`, `matches`, and `bets`.
+
+It also includes a PostgreSQL function `get_player_stats` to efficiently calculate player statistics.
+
+## API Routes
+
+This project uses Next.js API routes for server-side logic:
+- `GET /api/players/search?q={query}`: Searches for players by name.
+- `GET /api/players/{id}/stats`: Retrieves detailed statistics for a specific player.
 
 ## Extra Features to Consider
 
-- **Real-time Updates:** Use Supabase Realtime to show live score updates and betting odds.
-- **Notifications:** Notify users when a match they bet on is about to start.
-- **Leaderboards:** Show a leaderboard of the users with the most PickleCash.
+- **Real-time Updates:** Use Supabase Realtime to show live score updates.
+- **Notifications:** Notify users when a match they're interested in is about to start.
+- **Leaderboards:** Show a leaderboard of the top players based on win percentage.
 - **User Avatars:** Allow users to upload a profile picture.
 - **Private Tournaments:** Allow users to create private, invite-only tournaments.
